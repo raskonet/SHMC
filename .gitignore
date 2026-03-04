@@ -1,0 +1,8 @@
+bin/
+*.o
+*.wav
+*.bak
+CLAUDE_DIARY.md
+VERIFICATION_PHASE*.txt
+composed.shmc
+init.sh
