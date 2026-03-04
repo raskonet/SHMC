@@ -1,0 +1,47 @@
+# ambient_pad.shmc — slow ambient texture, 60 BPM
+# FM pad with gentle chord changes
+
+PATCH fm_pad {
+    osc sin ONE
+    osc sin ONE
+    fm $0 $1 4
+    adsr 12 10 25 20
+    mul $2 $3
+    lpf $4 28
+    out $5
+}
+
+MOTIF chord_C {
+    note 60 6 7
+    note 64 6 7
+    note 67 6 7
+}
+
+MOTIF chord_Am {
+    note 57 6 7
+    note 60 6 7
+    note 64 6 7
+}
+
+MOTIF chord_F {
+    note 53 6 7
+    note 57 6 7
+    note 60 6 7
+}
+
+MOTIF chord_G {
+    note 55 6 7
+    note 59 6 7
+    note 62 6 7
+}
+
+SECTION ambient_loop 16.0 {
+    use chord_C  @  0 patch fm_pad
+    use chord_Am @  4 patch fm_pad
+    use chord_F  @  8 patch fm_pad
+    use chord_G  @ 12 patch fm_pad
+}
+
+SONG ambient 60.0 {
+    play ambient_loop x3
+}

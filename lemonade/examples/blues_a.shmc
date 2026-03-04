@@ -1,0 +1,73 @@
+# blues_a.shmc — 12-bar blues in A, 100 BPM
+# Demonstrates: walking bass, chord pads, transposition across sections
+
+# ── Patches ──────────────────────────────────────────────────────────
+
+PATCH bass {
+    saw ONE
+    adsr 0 6 15 8
+    mul $0 $1
+    lpf $2 20
+    out $3
+}
+
+PATCH pad {
+    osc saw ONE
+    osc saw ONE
+    fm $0 $1 3
+    adsr 4 8 22 16
+    mul $2 $3
+    lpf $4 30
+    out $5
+}
+
+# ── Motifs ───────────────────────────────────────────────────────────
+
+MOTIF walk_A {
+    # A2-E3-C#3-G#2  (A root in 2nd oct, dur_idx 4 = quarter)
+    note 45 4 9
+    note 52 4 8
+    note 49 4 8
+    note 44 4 7
+}
+
+MOTIF chord_A {
+    note 57 5 6
+    note 61 5 6
+    note 64 5 6
+}
+
+# ── Sections ─────────────────────────────────────────────────────────
+
+# Standard 12-bar: I(4) IV(2) I(2) V(1) IV(1) I(2)
+SECTION blues_12bar 48.0 {
+    # I chord — A (bars 1-4)
+    use walk_A @  0 x4 patch bass
+    use chord_A @ 0 x4 patch pad
+
+    # IV chord — D (bars 5-6), transpose bass +5
+    use walk_A @ 16 x2 patch bass t=5
+    use chord_A @ 16 x2 patch pad t=5
+
+    # I chord — A (bars 7-8)
+    use walk_A @ 24 x2 patch bass
+    use chord_A @ 24 x2 patch pad
+
+    # V chord — E (bar 9), transpose +7
+    use walk_A @ 32 x1 patch bass t=7
+    use chord_A @ 32 x1 patch pad t=7
+
+    # IV chord — D (bar 10), transpose +5
+    use walk_A @ 36 x1 patch bass t=5
+    use chord_A @ 36 x1 patch pad t=5
+
+    # I chord — A (bars 11-12, turnaround)
+    use walk_A @ 40 x2 patch bass
+    use chord_A @ 40 x2 patch pad
+}
+
+# ── Song ─────────────────────────────────────────────────────────────
+
+SONG blues_in_A 100.0 {
+    play blues_12bar x2
+}

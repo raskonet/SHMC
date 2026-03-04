@@ -1,0 +1,81 @@
+# jazz_loop.shmc — Example SHMC DSL file
+# A two-bar jazz loop in D minor, 120 BPM.
+# Demonstrates: FM bass patch, SAW lead patch,
+# motif scheduling, transposition, and vel_scale.
+#
+# This file is the kind of output the Lemonade LLM generates.
+# Run directly with: shmc_render jazz_loop.shmc out.wav
+
+# ── Patches ────────────────────────────────────────────────────────
+
+PATCH fm_bass {
+    # FM bass: carrier = ONE-frequency osc, modulated by itself
+    osc sin ONE
+    osc sin ONE
+    fm $0 $1 6
+    adsr 1 8 20 10
+    mul $2 $3
+    lpf $4 22
+    out $5
+}
+
+PATCH saw_lead {
+    # Bright saw lead with a medium attack and slow release
+    saw ONE
+    adsr 3 6 18 14
+    mul $0 $1
+    lpf $2 35
+    out $3
+}
+
+# ── Motifs ─────────────────────────────────────────────────────────
+
+MOTIF bass_Dm {
+    # D2 - A2 - F2 - C3 walking pattern (dur_idx 4 = quarter note)
+    note 38 4 9
+    note 45 4 8
+    note 41 4 8
+    note 48 4 7
+}
+
+MOTIF bass_Gm {
+    # G2 - D3 - Bb2 - F3
+    note 43 4 9
+    note 50 4 8
+    note 46 4 8
+    note 53 4 7
+}
+
+MOTIF lead_phrase_A {
+    # D4 E4 F4 A4 — ascending idea, 8th notes (dur_idx 3)
+    note 62 3 10
+    note 64 3 9
+    note 65 3 9
+    note 69 3 11
+}
+
+MOTIF lead_phrase_B {
+    # G4 F4 E4 D4 — descending answer
+    note 67 3 10
+    note 65 3 9
+    note 64 3 9
+    note 62 3 8
+}
+
+# ── Section (8 beats = 2 bars at 4/4) ──────────────────────────────
+
+SECTION jazz_2bar 8.0 {
+    # Bass: Dm for bar 1, Gm for bar 2
+    use bass_Dm @ 0 patch fm_bass
+    use bass_Gm @ 4 patch fm_bass
+
+    # Lead: phrase A over bar 1, phrase B over bar 2 (softer)
+    use lead_phrase_A @ 0 patch saw_lead v=0.85
+    use lead_phrase_B @ 4 patch saw_lead v=0.75
+}
+
+# ── Song: loop the 2-bar section 4 times ───────────────────────────
+
+SONG jazz_loop 120.0 {
+    play jazz_2bar x4
+}
