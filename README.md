@@ -2,6 +2,8 @@
 
 A procedural music system that evolves DSL programs into structured, harmonically coherent audio. Combines **MCTS tree search**, a **multi-layer fitness function** grounded in music theory, and a local **LLM** that translates natural language prompts into code.
 
+*Note: The current fitness metric heuristics (especially the symbolic harmony evaluations) are highly experimental and actively being tuned to better correlate with human acoustic aesthetics.*
+
 The core idea: instead of generating waveforms directly, SHMC generates and mutates *programs*. The same DSL file always produces the same WAV — fully deterministic, inspectable, and editable.
 
 ---
@@ -9,69 +11,56 @@ The core idea: instead of generating waveforms directly, SHMC generates and muta
 ## Quick Start
 
 ```bash
-# 1. Build everything
+# 1. Clone the repo
+git clone https://github.com/raskonet/SHMC && cd SHMC
+
+# 2. Build everything
 make
 
-# 2. Start your local LLM server (separate terminal)
-./start_llama.sh
+# 3. Start your local LLM server (separate terminal, see options below)
 
-# 3. Compose from a text prompt
+# 4. Compose from a text prompt
 ./shmc.sh compose --prompt "jazz piano at 90 BPM" --play
 
-# 4. Evolve an existing piece with MCTS
+# 5. Evolve an existing piece with MCTS
 ./shmc.sh evolve lemonade/examples/blues_a.shmc --play
 
-# 5. Render a DSL file directly to WAV (no evolution)
+# 6. Render a DSL file directly to WAV (no evolution)
 ./shmc.sh render lemonade/examples/complex_song_v2.dsl out.wav
 
-# 6. Run all 182 formal verification tests
+# 7. Run all 182 formal verification tests
 ./shmc.sh verify
-```
-
----
-
-## Installation
-
-### Requirements
-
-| Tool | Version | Notes |
-|------|---------|-------|
-| `gcc` | >= 9 | C17, compiled with `-O2 -Wall` |
-| `make` | any | standard GNU make |
-| `python3` | >= 3.8 | compose pipeline + Python verify suites |
-| `aplay` / `afplay` | -- | optional, Linux/macOS playback |
-
-### Build
-
-```bash
-git clone <repo> shmc && cd shmc
-make           # builds bin/shmc_render, bin/shmc_evolve, bin/verify/*
-make verify    # run all 182 tests to confirm everything works
 ```
 
 ---
 
 ## LLM Setup
 
-SHMC needs a local LLM server to translate English prompts into DSL. Three options:
+SHMC needs an LLM server to translate English prompts into DSL. There are three ways to run it:
 
-**Option 1 — llama-server (recommended for iGPUs)**
+**Option 1 — Lemonade SDK (Recommended)**
+Use the official Lemonade server to pull and run the model.
+```bash
+# Pull the model
+lemonade-server pull user.SeedCoder --checkpoint unsloth/Seed-Coder-8B-Instruct-GGUF:Q4_K_M --recipe llamacpp
+
+# Run it (tune --ctx-size and -ngl to fit your hardware)
+lemonade-server run user.SeedCoder --port 8002 --ctx-size 4096 --llamacpp-args "-ngl 4"
+```
+
+**Option 2 — Custom llama-server script (Good for low-RAM iGPUs)**
+If Lemonade's auto-management uses too much RAM, use the fallback script:
 ```bash
 ./start_llama.sh
+# You can optionally specify a custom GGUF path:
+# ./start_llama.sh --path_to_gguf /path/to/model.gguf
 ```
-Edit the script to adjust `--n-gpu-layers` (set to `0` on very low-memory machines).
 
-**Option 2 — Groq API (fast, free tier)**
+**Option 3 — Groq API (fast, free tier)**
 If local inference is too slow, use the included proxy that forwards to Groq:
 ```bash
 export GROQ_API_KEY=gsk_...
 python3 groq_proxy.py   # listens on port 8002, same interface as llama-server
-```
-Get a free key at [console.groq.com](https://console.groq.com).
-
-**Option 3 — Lemonade SDK**
-```bash
-lemonade-server run Seed-Coder-8B-Instruct-GGUF --port 8002
 ```
 
 ---
@@ -200,8 +189,6 @@ UCT-MCTS over the space of DSL programs.
 **Policy guidance:** after each pitch mutation, notes are probabilistically snapped to the nearest in-scale pitch (70% probability), biasing toward diatonic regions without hard constraints.
 
 **MAP-Elites:** a 6^4 = 1296-cell behavior grid (brightness x rhythm density x pitch diversity x tonal tension) tracks the best program found in each behavioral region, ensuring diverse exploration.
-
-**Measured result on `complex_song_v2.dsl`:** beam 0.4815 → MCTS 0.5661 (+17.5% fitness), with MCTS producing significantly more spectrally varied programs.
 
 ---
 
