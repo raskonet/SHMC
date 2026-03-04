@@ -2,7 +2,7 @@
 
 A procedural music system that evolves DSL programs into structured, harmonically coherent audio. Combines **MCTS tree search**, a **multi-layer fitness function** grounded in music theory, and a local **LLM** that translates natural language prompts into code.
 
-*Note: The current fitness metric heuristics (especially the symbolic harmony evaluations) are highly experimental and actively being tuned to better correlate with human acoustic aesthetics.*
+*Note: The fitness heuristics (especially symbolic harmony evaluations) are experimental and actively being tuned to better correlate with human perception.*
 
 The core idea: instead of generating waveforms directly, SHMC generates and mutates *programs*. The same DSL file always produces the same WAV — fully deterministic, inspectable, and editable.
 
@@ -17,7 +17,7 @@ git clone https://github.com/raskonet/SHMC && cd SHMC
 # 2. Build everything
 make
 
-# 3. Start your local LLM server (separate terminal, see options below)
+# 3. Start your local LLM server (separate terminal, see LLM Setup below)
 
 # 4. Compose from a text prompt
 ./shmc.sh compose --prompt "jazz piano at 90 BPM" --play
@@ -34,33 +34,69 @@ make
 
 ---
 
-## LLM Setup
+## Installation
 
-SHMC needs an LLM server to translate English prompts into DSL. There are three ways to run it:
+### Requirements
 
-**Option 1 — Lemonade SDK (Recommended)**
-Use the official Lemonade server to pull and run the model.
+| Tool | Version | Notes |
+|------|---------|-------|
+| `gcc` | >= 9 | C17, compiled with `-O2 -Wall` |
+| `make` | any | standard GNU make |
+| `python3` | >= 3.8 | compose pipeline + Python verify suites |
+| `aplay` / `afplay` | -- | optional, Linux/macOS playback |
+
 ```bash
-# Pull the model
-lemonade-server pull user.SeedCoder --checkpoint unsloth/Seed-Coder-8B-Instruct-GGUF:Q4_K_M --recipe llamacpp
-
-# Run it (tune --ctx-size and -ngl to fit your hardware)
-lemonade-server run user.SeedCoder --port 8002 --ctx-size 4096 --llamacpp-args "-ngl 4"
+make           # builds bin/shmc_render, bin/shmc_evolve, bin/verify/*
+make verify    # run all 182 tests
 ```
 
+---
+
+## LLM Setup
+
+SHMC needs an LLM server to translate English prompts into DSL. Three options:
+
+**Option 1 — Lemonade SDK (Recommended for AMD Challenge)**
+
+```bash
+# Install the CPU backend (required on Linux even if you use Vulkan)
+lemonade-server recipes --install llamacpp:cpu
+
+# Configure the backend for your model (CLI flags don't work on Linux .deb installs)
+mkdir -p ~/.cache/lemonade
+cat > ~/.cache/lemonade/recipe_options.json << 'JSON'
+{
+    "Qwen3-4B-GGUF": {
+        "llamacpp_backend": "vulkan",
+        "ctx_size": 4096
+    }
+}
+JSON
+
+# Pull and run
+lemonade-server pull Qwen3-4B-GGUF
+lemonade-server run Qwen3-4B-GGUF --port 8002
+```
+
+> **Note:** On Linux, `--llamacpp` and `--ctx-size` CLI flags are silently ignored when loading models.
+> The `recipe_options.json` file is the correct way to set per-model backend options.
+> Use `"llamacpp_backend": "cpu"` if Vulkan causes issues on your hardware.
+
 **Option 2 — Custom llama-server script (Good for low-RAM iGPUs)**
-If Lemonade's auto-management uses too much RAM, use the fallback script:
+
 ```bash
 ./start_llama.sh
-# You can optionally specify a custom GGUF path:
+# Optionally specify a custom GGUF path:
 # ./start_llama.sh --path_to_gguf /path/to/model.gguf
 ```
 
-**Option 3 — Groq API (fast, free tier)**
-If local inference is too slow, use the included proxy that forwards to Groq:
+**Option 3 — Groq API**
+
+If local inference is too slow, use the included proxy that forwards to Groq's API:
+
 ```bash
-export GROQ_API_KEY=gsk_...
-python3 groq_proxy.py   # listens on port 8002, same interface as llama-server
+export GROQ_API_KEY=gsk_...   # get a free key at console.groq.com
+python3 groq_proxy.py          # listens on port 8002, drop-in replacement
 ```
 
 ---
@@ -83,7 +119,7 @@ python3 groq_proxy.py   # listens on port 8002, same interface as llama-server
 | `--iters N` | `60` | MCTS iterations |
 | `--play` | off | Play result when done |
 | `--dry-run` | off | Generate DSL only, skip render |
-| `--model NAME` | `Seed-Coder-8B-Instruct-Q4_K_M` | LLM model name |
+| `--model NAME` | `Qwen3-4B-GGUF` | Lemonade model name |
 
 ### `evolve` — evolve an existing DSL file
 
@@ -184,11 +220,13 @@ UCT-MCTS over the space of DSL programs.
 - 15% structural motif ops — invert, retrograde, augment, diminish
 - 15% harmonic mutations — circle-of-5ths, chord substitution, secondary dominant
 - 15% rhythm — note duration, beat offset
-- 5% patch structure — DSP op rewiring (rare, preserves timbre stability)
+- 5% patch structure — DSP op rewiring
 
 **Policy guidance:** after each pitch mutation, notes are probabilistically snapped to the nearest in-scale pitch (70% probability), biasing toward diatonic regions without hard constraints.
 
-**MAP-Elites:** a 6^4 = 1296-cell behavior grid (brightness x rhythm density x pitch diversity x tonal tension) tracks the best program found in each behavioral region, ensuring diverse exploration.
+**MAP-Elites:** a 6^4 = 1296-cell behavior grid (brightness x rhythm density x pitch diversity x tonal tension) tracks the best program found in each behavioral region.
+
+**Measured result on `complex_song_v2.dsl`:** beam 0.4815 → MCTS 0.5661 (+17.5% fitness).
 
 ---
 
